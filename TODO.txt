@@ -1,0 +1,62 @@
+
+Random List of Todo's
+=====================
+
+Register Page
+ - CSS Style: class and id styling of Profile picture upload
+ - Image file validation
+    - maximum size
+ - Does the profile picture need a different filename choice?  Maybe based on the upload time.
+ - Captcha Setup
+ - Use HTML5 input type="email"
+ 
+ Admin Page - Users
+    - Edit user password
+        See the "Manage" page for changing password, etc.
+    - Validation of fields
+        http://www.asp.net/web-pages/overview/ui-layouts-and-themes/validating-user-input-in-aspnet-web-pages-sites
+    - CSS Styles 
+
+Admin Page - Charts
+    - Decide which 3 to show...
+
+Delete User Page
+    - Delete user Works, but isn't in the format required by the assignment
+    - Delete profile picture as well
+    - Restrict access to Admin only
+    - CSS Layout
+
+Member Page
+    - Display only the latest 5 Posts
+        See page 92 in the text for "Paging through Data" -- might help
+    - Decide how to track "Most Followed"
+        Session Variables?
+        Query the db on each page load (most likely)
+    - Add Aside
+    - allows <script>alert("This is a test")</script> but .NET catches it as "suspicious".
+    - CSS Style messageTextArea
+    - CSS Style postMessage
+        fixed widths on the post columns
+
+Aside
+    - See the "About" page for how the Aside is coded.
+    - Most Followed
+    - Most Active
+        
+
+Follow Page
+    - Display only the latest 5 Posts
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Tom April 10
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-Include Email confirmation for registration (5 marks)
+
+-Publish website so we can register for reCaptcha keys. An alternative could be to just add an "I am not a robot" checkbox. 
+
+-Need "most followed" and "most active contributor" links.
+
+-Create 2 seperate Admin pages for Manage Users (what we currently have) and Main Page (just to show the charts)
+
+
+

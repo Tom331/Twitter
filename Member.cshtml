@@ -1,0 +1,117 @@
+@{
+    if (!WebSecurity.IsAuthenticated) {
+        Response.Redirect("~/Account/Login?returnUrl=" + Request.Url.LocalPath);
+    }
+
+    Layout = "~/_SiteLayout.cshtml";
+
+    if ((!User.IsInRole("Member")) && (!User.IsInRole("Admin"))) {
+        Response.Redirect("~/Account/Login");
+    }
+   
+    Page.Title = "Forum Membership Page";
+
+    var db = Database.Open("StarterSite");
+    var forumQueryString = "SELECT * " +
+                           "FROM ForumPosts, UserProfile " +
+                           "WHERE UserProfile.UserId=ForumPosts.PostFrom " +
+                           "ORDER BY PostDate DESC";
+
+    //Variables for Forum Posts
+    var userId = WebSecurity.CurrentUserId;
+    var newPost = Request["messageTextArea"];
+
+    // Validation code for Post
+    Validation.RequireField("messageTextArea", "You must enter a message between 1 and 242 characters.");
+    Validation.Add("messageTextArea",
+        Validator.StringLength(
+            maxLength: 242,
+            minLength: 1,
+            errorMessage: "Message must be at least 1 characters and less than 242 characters."));
+
+        
+    //Pull Picture from database
+    var username = WebSecurity.CurrentUserName;
+    var currentUserProfile = db.QuerySingle("SELECT Username,Picture FROM UserProfile WHERE LOWER(Email) = LOWER(@0)", username);
+
+    //Member Since
+    var memberSince = db.QuerySingle("SELECT MemberSince FROM UserProfile WHERE LOWER(Email) = LOWER(@0)", username);
+
+    
+    // Post message into ForumPosts table
+    if (IsPost) {
+        if (Validation.IsValid()) {
+            newPost = Request["messageTextArea"];
+            if (String.IsNullOrWhiteSpace(newPost)) {
+                ModelState.AddError("messageTextArea","Message Text required");
+            }
+            if (ModelState.IsValid) {
+                var insertQuery = "INSERT INTO ForumPosts (PostMessage,PostFrom) VALUES (@0,@1)";
+                db.Execute(insertQuery, newPost, userId);
+            }
+        }
+    }
+
+
+}
+
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title></title>
+</head>
+
+<body>
+
+    <h1>Hello, <a class="email" href="~/Account/Manage" title="Manage">@currentUserProfile.Username</a>!</h1>
+    <p>Member since: @memberSince.MemberSince</p>
+    <br><br>
+
+    <img src="~/Images/@currentUserProfile.Picture" alt="profImg" width="300px"> 
+    <br><br>
+        
+    <!-- debug test code
+    
+    <p>Current UserId = @userId</p>
+    <p>Current UserName = @username</p>
+    <p>profile image: @currentUserProfile.Picture</p>
+    
+     -->
+        
+    <p>What are you doing?</p>
+    <form method="post" action="" >
+        @Html.ValidationSummary("Message Post was unsuccessful. Please correct the errors and try again.", 
+                                excludeFieldErrors: true, htmlAttributes: null)
+        <textarea class="messageTextArea" id="messageTextArea" name="messageTextArea" autofocus  @Validation.For("messageTextArea")></textarea>
+        @* Write any email validation errors to the page *@
+        @Html.ValidationMessage("messageTextArea")
+        <input class="postMessage" type="submit" value="Post Message" />
+    </form>
+        
+    @*@Html.ValidationSummary("Error with your submission")*@
+
+    <!-- Message Posts below -->
+    <!-- I used a table for now, just to get the data displaying.  
+            TODO: reformat the messages. -->
+    <table border="1">
+    <tbody >
+        @foreach(var row in db.Query(forumQueryString)) {
+            <tr >
+                <td><img src="~/Images/@row.Picture" alt="@username" width="100px"> </td>
+                <td class="tableBackground">@row.Username </td>
+                <td class="tableBackground">@row.PostMessage </td>
+                <td class="tableBackground">@row.PostDate </td>
+                <td class="tableBackground"><a href="@Href("~/Follow",row.PostFrom)">follow</a></td>
+
+            </tr>
+            
+        }
+    </tbody>
+    </table>
+    
+    
+
+</body>
+</html>

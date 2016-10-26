@@ -1,0 +1,64 @@
+﻿@{
+    Layout="~/_SiteLayout.cshtml";
+    var db = Database.Open("StarterSite");
+
+    if (!User.IsInRole("Admin")) {
+        Response.Redirect("~/404");
+    }
+
+    var userID=UrlData[0];                       <!--get the ID from the URL -->
+
+    if (userID.IsEmpty()) {
+        Response.Redirect(@Href("~/Admin"));
+    }
+
+    <!-- User must be deleted from the Roles table before deleting from UserProfiles table -->
+    //var rowRoles = db.QuerySingle("SELECT * FROM webpages_UsersInRoles WHERE UserId=@0", userID);
+    if (IsPost && !userID.IsEmpty()) {
+        var deleteQueryString = "DELETE FROM webpages_UsersInRoles WHERE UserId=@0";
+        db.Execute(deleteQueryString,userID);
+    }
+
+    if (IsPost && !userID.IsEmpty()) {                          <!-- Uses IsPost for a "confirm" button-->
+        var rowUser = db.QuerySingle("SELECT Picture FROM UserProfile WHERE UserId=@0", userID);
+        var deleteQueryString = "DELETE FROM UserProfile WHERE UserId=@0";
+        var profileImage = rowUser.Picture;
+        // Don't delete the default profile picture
+        if (profileImage != "defaultProfilePicture.jpg") {
+            var fullPath = Server.MapPath("~/Images/" + profileImage);
+            if (File.Exists(fullPath)) {
+                File.Delete(fullPath);
+            }
+        }
+        db.Execute(deleteQueryString,userID);
+        Response.Redirect("~/Admin");
+    }
+
+    // The selected user in the URLData
+    var selectedUser = db.QuerySingle("SELECT UserId,Picture,Email,Username FROM UserProfile WHERE UserProfile.UserId = @0", userID);
+    
+}
+
+<!DOCTYPE html>
+
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <title>Delete a User</title>
+    </head>
+    <body>
+        <h1>Delete User - Confirmation</h1>
+
+        <form method="post" action="" name="form">
+            <p>Are you sure you want to delete the following user?</p>
+
+            <img src="~/Images/@selectedUser.Picture" alt="profImg" width="300px">
+
+            <p>Email: @selectedUser.Email <br /> </p>
+            <p>Username: @selectedUser.Username <br /> </p>
+            <p>Picture: @selectedUser.Picture</p>
+            <p><input type="submit" value="Delete" /></p>
+        
+        </form>
+    </body>
+</html>

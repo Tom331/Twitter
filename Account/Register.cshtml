@@ -1,0 +1,232 @@
+﻿@* Remove this section if you are using bundling *@
+@section Scripts {
+    <script src="~/Scripts/jquery.validate.min.js"></script>
+    <script src="~/Scripts/jquery.validate.unobtrusive.min.js"></script>
+}
+
+
+@{
+
+//user is for checking if email already exists
+//userName is for checking if username already exists
+
+
+    Layout = "~/_SiteLayout.cshtml";
+    Page.Title = "Register";
+
+    // Initialize general page variables
+    var username = "";
+    var email = "";
+    var password = "";
+    var confirmPassword = "";
+    WebImage photo = null;
+    var newFileName = "";
+    var imagePath = "";
+    var imageType = "";
+
+    // Setup validation
+    Validation.RequireField("username", "You must specify a username.");
+    Validation.RequireField("email", "You must specify an email address.");
+    Validation.RequireField("password", "Password cannot be blank.");
+    //Validation.RequireField("Image", "Photo must be either a jpg or png less than 200kb.");
+
+    // Validate Password
+    Validation.Add("confirmPassword",
+        Validator.EqualsTo("password", "Password and confirmation password do not match."));
+    Validation.Add("password",
+        Validator.StringLength(
+            maxLength: Int32.MaxValue,
+            minLength: 6,
+            errorMessage: "Password must be at least 6 characters"));
+
+    //Username Validation
+    Validation.Add("username",
+        Validator.StringLength(
+            maxLength: Int32.MaxValue,
+            minLength: 5,
+            errorMessage: "username must be at least 5 characters"));
+
+    // Validate email
+    Validation.Add("email", 
+        Validator.Regex(@"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,4}$", 
+        "Invalid format for an email address")
+        );
+    
+    // If this is a POST request, validate and process data
+    if (IsPost) {
+        AntiForgery.Validate();
+
+        username = Request.Form["username"];
+        //WebImage photo = new WebImage(Request.InputStream);
+        photo = WebImage.GetImageFromRequest("Image");
+        email = Request.Form["email"];
+        password = Request.Form["password"];
+        confirmPassword = Request.Form["confirmPassword"];
+
+        // Validate and Upload Image:
+        if(photo != null){
+            // TODO: Better filename choice??
+            imageType = photo.ImageFormat;
+            newFileName = Guid.NewGuid().ToString() + "_" + imageType + "_" + Path.GetFileName(photo.FileName);
+            imagePath = @"Images\" + newFileName;
+            
+            photo.Save(@"~\" + imagePath);
+            if ((imageType == "jpeg") || (imageType == "png") ) {
+                photo.Save(@"~\" + imagePath);
+            } else {
+            //    photo = null;
+                ModelState.AddError("Image","Your photo must be either jpg or png.");
+            }
+                    
+        } else {
+            // If an invalid file was uploaded, WebImage.getImageFromRequest does not retreive it.  
+            // Instead, use the default profile picture.
+            newFileName = "defaultProfilePicture.jpg";
+        }
+        // TODO: Default image needs to be set if photo==null
+
+
+        // Validate the user's captcha answer
+        // if (!ReCaptcha.Validate("PRIVATE_KEY")) {
+        //     ModelState.AddError("recaptcha", "Captcha response was not correct");
+        // }
+
+        // If all information is valid, create a new account
+        if (Validation.IsValid() && (ModelState.IsValid)) {
+            // Insert a new user into the database
+            var db = Database.Open("StarterSite");
+
+            // Check if email already exists
+            var user = db.QuerySingle("SELECT Email FROM UserProfile WHERE LOWER(Email) = LOWER(@0)", email);
+
+            //Check if Username already exists
+            var userName = db.QuerySingle("SELECT Username FROM UserProfile WHERE LOWER(Username) = LOWER(@0)", username); 
+
+            //EMAIL AND USERNAME AND IMAGE
+            if (user == null && userName == null) {
+                
+                // Insert email, photo and username into the profile table
+                db.Execute("INSERT INTO UserProfile (Email, Username, Picture) VALUES (@0,@1,@2)", email, username, newFileName);
+
+                var userResult = db.QuerySingle("SELECT UserId FROM UserProfile WHERE LOWER(Email) = LOWER(@0)", email);
+                
+                // Assign the new user to "Member" role by default
+                var roleResult = db.QuerySingle("SELECT RoleId FROM webpages_Roles WHERE RoleName=@0","Member");
+                db.Execute("INSERT INTO webpages_UsersInRoles (UserId,RoleId) Values (@0,@1)", userResult.UserId,roleResult.RoleId);
+                
+                
+                // Create and associate a new entry in the membership database.
+                // If successful, continue processing the request
+                try {
+                    bool requireEmailConfirmation = !WebMail.SmtpServer.IsEmpty();
+                    var token = WebSecurity.CreateAccount(email, password, requireEmailConfirmation);
+                    if (requireEmailConfirmation) {
+                        var hostUrl = Request.Url.GetComponents(UriComponents.SchemeAndServer, UriFormat.Unescaped);
+                        var confirmationUrl = hostUrl + VirtualPathUtility.ToAbsolute("~/Account/Confirm?confirmationCode=" + HttpUtility.UrlEncode(token));
+
+                        WebMail.Send(
+                            to: email,
+                            subject: "Please confirm your account",
+                            body: "Your confirmation code is: " + token + ". Visit <a href=\"" + confirmationUrl + "\">" + confirmationUrl + "</a> to activate your account."
+                        );
+                    }
+
+                    if (requireEmailConfirmation) {
+                        // Thank the user for registering and let them know an email is on its way
+                        Response.Redirect("~/Account/Thanks");
+                    } else {
+                        // Navigate back to the homepage and exit
+                        WebSecurity.Login(email, password);
+
+                        Response.Redirect("~/");
+                    }
+                } catch (System.Web.Security.MembershipCreateUserException e) {
+                    ModelState.AddFormError(e.Message);
+                }
+            } else {
+                // User already exists in db
+                ModelState.AddFormError("Email or username address is already in use.");
+
+                
+            }
+        }       //end Validation(IsValid)
+    }       // END If(IsPost)
+
+}
+
+<!DOCTYPE html>
+<html lang="en>">
+<head>
+    
+    <script src='https://www.google.com/recaptcha/api.js'></script>
+
+</head>
+
+<body>
+
+<hgroup class="title">
+    <h1>@Page.Title.</h1>
+    <h2>Create a new account.</h2>
+</hgroup>
+
+<form method="post" enctype="multipart/form-data" >
+    @AntiForgery.GetHtml()
+    @* If at least one validation error exists, notify the user *@
+    @Html.ValidationSummary("Account creation was unsuccessful. Please correct the errors and try again.", excludeFieldErrors: true, htmlAttributes: null)
+
+    <fieldset style="width: 500px">
+        <legend>Registration Form</legend>
+        <ol>
+
+            <li style="margin-bottom: 20px" class="username">
+                <label for="username" @if(!ModelState.IsValidField("username")){<text>class="error-label"</text>}>Username</label><br>
+                <input type="text" id="username" name="username" value="@username" @Validation.For("username") />
+                @* Write any email validation errors to the page *@
+                @Html.ValidationMessage("username")
+            </li>
+
+            <li style="margin-bottom: 20px" class="email">
+                <label for="email" @if(!ModelState.IsValidField("email")){<text>class="error-label"</text>}>Email address</label><br>
+                <input type="text" id="email" name="email" value="@email" @Validation.For("email") />
+                @* Write any email validation errors to the page *@
+                @Html.ValidationMessage("email")
+            </li>
+            <li style="margin-bottom: 20px" class="password">
+                <label for="password" @if(!ModelState.IsValidField("password")) {<text>class="error-label"</text>}>Password</label><br>
+                <input type="password" id="password" name="password" @Validation.For("password") />
+                @* Write any password validation errors to the page *@
+                @Html.ValidationMessage("password")
+            </li>
+            <li style="margin-bottom: 20px" class="confirm-password">
+                <label for="confirmPassword" @if(!ModelState.IsValidField("confirmPassword")) {<text>class="error-label"</text>}>Confirm password</label><br>
+                <input type="password" id="confirmPassword" name="confirmPassword" @Validation.For("confirmPassword") />
+                @* Write any password validation errors to the page *@
+                @Html.ValidationMessage("confirmPassword")
+            </li>
+            <!-- TODO: Captcha SETUP -->
+            <li class="recaptcha">
+
+
+                <div class="g-recaptcha" data-sitekey="6Lf1Vx0TAAAAAI8uBfB95WOHQf2a_zfnhg1RnPJt"></div>
+
+
+                @*
+                @ReCaptcha.GetHtml("6LfqEB0TAAAAADNTY8OJoCVEg_Nqs08OGV5UYu8T", theme: "white")
+                @Html.ValidationMessage("recaptcha")
+               *@
+                
+            </li>
+            <li class="image-upload">   <!--TODO: CSS Style: class and id-->
+                <label for="Image">Image</label>
+                <input type="file" id="Image" name="Image" /> <br/>
+                @* TODO: Validation like previous entries?  Also value="" field *@
+                @Html.ValidationMessage("Image")
+            </li>
+        </ol>
+        
+        <input type="submit" value="Register" />
+    </fieldset>
+</form>
+
+</body>
+</html>
